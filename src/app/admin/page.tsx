@@ -2,9 +2,18 @@
 
 import { useCallback, useState } from 'react';
 
+const PRODUCT_OPTIONS = [
+  'ground_up_construction',
+  'fix_and_flip',
+  'rental_loans',
+  'stabilized_bridge',
+  'mf_sbl_faq',
+];
+
 export default function AdminPage() {
   const [productId, setProductId] = useState('ground_up_construction');
   const [manualText, setManualText] = useState('');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploadResult, setUploadResult] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResult, setSearchResult] = useState<Record<string, unknown>[] | null>(null);
@@ -13,7 +22,8 @@ export default function AdminPage() {
     setUploadResult(null);
     const formData = new FormData();
     formData.set('product_id', productId);
-    formData.set('manual_text', manualText);
+    if (manualText.trim()) formData.set('manual_text', manualText);
+    if (selectedFile) formData.set('file', selectedFile);
 
     const res = await fetch('/api/manual/upload', {
       method: 'POST',
@@ -22,10 +32,11 @@ export default function AdminPage() {
     const data = await res.json();
     if (data.count !== undefined) {
       setUploadResult(`Uploaded ${data.count} chunks.`);
+      setSelectedFile(null);
     } else {
       setUploadResult(`Error: ${data.error ?? 'Unknown'}`);
     }
-  }, [productId, manualText]);
+  }, [productId, manualText, selectedFile]);
 
   const handleSearch = useCallback(async () => {
     setSearchResult(null);
@@ -51,30 +62,47 @@ export default function AdminPage() {
             <h2 className="mb-4 font-medium text-slate-700">Upload Manual</h2>
             <div className="mb-4">
               <label className="mb-1 block text-sm text-slate-600">
-                Product ID
+                Product
               </label>
-              <input
-                type="text"
+              <select
                 value={productId}
                 onChange={(e) => setProductId(e.target.value)}
                 className="w-full rounded border border-slate-300 px-3 py-2"
-              />
+              >
+                {PRODUCT_OPTIONS.map((id) => (
+                  <option key={id} value={id}>{id}</option>
+                ))}
+              </select>
             </div>
             <div className="mb-4">
               <label className="mb-1 block text-sm text-slate-600">
-                Manual text (paste or will support file upload)
+                PDF file
+              </label>
+              <input
+                type="file"
+                accept=".pdf"
+                onChange={(e) => setSelectedFile(e.target.files?.[0] ?? null)}
+                className="w-full rounded border border-slate-300 px-3 py-2 text-sm"
+              />
+              {selectedFile && (
+                <p className="mt-1 text-xs text-slate-500">{selectedFile.name}</p>
+              )}
+            </div>
+            <div className="mb-4">
+              <label className="mb-1 block text-sm text-slate-600">
+                Or paste text
               </label>
               <textarea
                 value={manualText}
                 onChange={(e) => setManualText(e.target.value)}
-                rows={12}
+                rows={8}
                 className="w-full rounded border border-slate-300 px-3 py-2 font-mono text-sm"
                 placeholder="Paste manual content here..."
               />
             </div>
             <button
               onClick={handleUpload}
-              disabled={!manualText.trim()}
+              disabled={!manualText.trim() && !selectedFile}
               className="rounded-md bg-slate-800 px-4 py-2 text-white hover:bg-slate-700 disabled:opacity-50"
             >
               Upload

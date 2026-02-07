@@ -3,6 +3,17 @@ import { chunkText } from '@/lib/utils/chunk';
 import { embedChunks } from '@/lib/openai/embeddings';
 import { insertManualChunks } from '@/lib/supabase/manual';
 import { supabase } from '@/lib/supabase/client';
+import { PDFParse } from 'pdf-parse';
+
+async function extractTextFromPdf(buffer: ArrayBuffer): Promise<string> {
+  const parser = new PDFParse({ data: buffer });
+  try {
+    const result = await parser.getText({});
+    return result.text ?? '';
+  } finally {
+    await parser.destroy();
+  }
+}
 
 export async function POST(request: Request) {
   try {
@@ -21,14 +32,17 @@ export async function POST(request: Request) {
     let text = manual_text;
     if (!text && file) {
       const buffer = await file.arrayBuffer();
-      const content = Buffer.from(buffer).toString('utf-8');
-      // Simple text extraction; for PDFs use pdf-parse or similar
-      text = content;
+      const isPdf = file.type === 'application/pdf' || file.name?.toLowerCase().endsWith('.pdf');
+      if (isPdf) {
+        text = await extractTextFromPdf(buffer);
+      } else {
+        text = Buffer.from(buffer).toString('utf-8');
+      }
     }
 
     if (!text || !text.trim()) {
       return NextResponse.json(
-        { error: 'manual_text or file with text content required' },
+        { error: 'manual_text or PDF/text file with content required' },
         { status: 400 }
       );
     }
