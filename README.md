@@ -1,36 +1,49 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Prometheus Call Copilot
 
-## Getting Started
+Real-time AI copilot for sales/loan agents during outbound calls.
 
-First, run the development server:
+## Setup
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+1. Copy `.env.example` to `.env.local` and fill in:
+   - `OPENAI_API_KEY`
+   - `DEEPGRAM_API_KEY`
+   - `NEXT_PUBLIC_SUPABASE_URL`
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+   - `SUPABASE_SERVICE_ROLE_KEY`
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+2. Run Supabase migrations:
+   ```bash
+   supabase db push
+   ```
+   Or run `supabase/migrations/001_initial.sql` in the Supabase SQL editor.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+3. Install and run:
+   ```bash
+   npm install
+   npm run dev
+   ```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+4. Open http://localhost:3000
 
-## Learn More
+## Pages
 
-To learn more about Next.js, take a look at the following resources:
+- **/** — Home
+- **/dashboard** — Agent dashboard (live transcript, suggestions, checklist)
+- **/admin** — Admin: upload manuals, search
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Integration Docs
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+See [docs/integrations/](./docs/integrations/) for:
 
-## Deploy on Vercel
+- [OpenAI](./docs/integrations/01-OPENAI.md)
+- [Deepgram](./docs/integrations/02-DEEPGRAM.md)
+- [Supabase](./docs/integrations/03-SUPABASE.md)
+- [HubSpot (Phase 2)](./docs/integrations/04-HUBSPOT.md)
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## MVP Features
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- Manual upload → chunk + embed → vector search
+- Session start/end, transcript ingestion
+- Copilot suggestions (next questions, manual answers, checklist)
+- End-of-call summary with copy for HubSpot
+- Simulate transcript (no Deepgram yet) for testing

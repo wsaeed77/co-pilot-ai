@@ -1,0 +1,20 @@
+{
+  "product_id": "ground_up_construction",
+  "product_name": "Ground Up Construction",
+  "eligibility": {
+    "states_allowed": ["FL", "GA", "TX"],
+    "notes": "Example eligibility notes"
+  },
+  "required_fields": [
+    { "key": "property_state", "label": "Property State", "question": "What state is the property in?" },
+    { "key": "fico", "label": "FICO", "question": "What's your approximate FICO score?" },
+    { "key": "experience_projects", "label": "Experience", "question": "How many ground-up projects have you completed?" },
+    { "key": "project_cost", "label": "Project Cost", "question": "What is the total project cost (land + construction)?" },
+    { "key": "arv", "label": "ARV", "question": "What is the estimated after-repair value (ARV)?" },
+    { "key": "loan_amount", "label": "Loan Amount", "question": "How much are you looking to borrow?" },
+    { "key": "exit_strategy", "label": "Exit Strategy", "question": "Is your plan to sell or refinance?" }
+  ],
+  "common_objections": [
+    { "topic": "leverage", "suggested_clarifiers": ["experience_projects", "fico", "arv", "project_cost"] }
+  ]
+}
