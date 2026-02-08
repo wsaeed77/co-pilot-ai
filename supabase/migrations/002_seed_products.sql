@@ -1,0 +1,8 @@
+-- Seed products so call_sessions FK is satisfied
+INSERT INTO products (id, name, config) VALUES
+  ('ground_up_construction', 'Ground Up Construction', '{"product_id":"ground_up_construction","product_name":"Ground Up Construction","eligibility":{"states_allowed":["FL","GA","TX"]},"required_fields":[{"key":"property_state","label":"Property State","question":"What state is the property in?"},{"key":"fico","label":"FICO","question":"What is your approximate FICO score?"},{"key":"experience_projects","label":"Experience","question":"How many ground-up projects have you completed?"},{"key":"project_cost","label":"Project Cost","question":"What is the total project cost?"},{"key":"arv","label":"ARV","question":"What is the estimated ARV?"},{"key":"loan_amount","label":"Loan Amount","question":"How much are you looking to borrow?"},{"key":"exit_strategy","label":"Exit Strategy","question":"Sell or refinance?"}]}'::jsonb),
+  ('fix_and_flip', 'Fix & Flip', '{"product_id":"fix_and_flip","product_name":"Fix & Flip","eligibility":{"states_allowed":[]},"required_fields":[]}'::jsonb),
+  ('rental_loans', 'Rental Loans', '{"product_id":"rental_loans","product_name":"Rental Loans","eligibility":{"states_allowed":[]},"required_fields":[]}'::jsonb),
+  ('stabilized_bridge', 'Stabilized Bridge', '{"product_id":"stabilized_bridge","product_name":"Stabilized Bridge","eligibility":{"states_allowed":[]},"required_fields":[]}'::jsonb),
+  ('mf_sbl_faq', 'MF SBL FAQ', '{"product_id":"mf_sbl_faq","product_name":"MF SBL FAQ","eligibility":{"states_allowed":[]},"required_fields":[]}'::jsonb)
+ON CONFLICT (id) DO NOTHING;

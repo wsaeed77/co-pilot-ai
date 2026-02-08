@@ -48,7 +48,16 @@ ${JSON.stringify(extractedFields)}
 ## Manual excerpts (use only these for answers)
 ${manualContext || '(no manual chunks retrieved)'}
 
-Return JSON with: suggested_questions (1-3), extracted_fields_updates (key/value from transcript), missing_required_fields (list), answer_suggestions (if lead asked product questions), agent_actions (warnings/reminders).`;
+Return JSON with this exact structure:
+{
+  "suggested_questions": [{ "field": "field_key", "question": "Question to ask?" }],
+  "extracted_fields_updates": {},
+  "missing_required_fields": [],
+  "answer_suggestions": [],
+  "agent_actions": []
+}
+
+ALWAYS include 1-3 suggested_questions. Base them on missing_required_fields: for each missing field, use the product's required_fields to get the question. Prioritize the most relevant next question for the conversation.`;
 
   const response = await getOpenAI().chat.completions.create({
     model: COPILOT_MODEL,
@@ -71,7 +80,27 @@ Return JSON with: suggested_questions (1-3), extracted_fields_updates (key/value
     };
   }
 
-  return JSON.parse(content) as CopilotOutput;
+  const parsed = JSON.parse(content) as CopilotOutput;
+  const mergedFields = { ...extractedFields, ...(parsed.extracted_fields_updates ?? {}) };
+  const missing =
+    parsed.missing_required_fields ??
+    product.required_fields.filter((f) => !mergedFields[f.key]).map((f) => f.key);
+  let questions = Array.isArray(parsed.suggested_questions) ? parsed.suggested_questions : [];
+
+  // Fallback: if LLM returned empty suggested_questions, use product config for missing fields
+  if (questions.length === 0 && missing.length > 0) {
+    questions = product.required_fields
+      .filter((f) => missing.includes(f.key))
+      .slice(0, 3)
+      .map((f) => ({ field: f.key, question: f.question }));
+  }
+
+  // Normalize: ensure each item has .question (handle string or {question} format)
+  questions = questions.map((q) =>
+    typeof q === 'string' ? { field: '', question: q } : { field: q?.field ?? '', question: q?.question ?? '' }
+  ).filter((q) => q.question);
+
+  return { ...parsed, suggested_questions: questions };
 }
 
 export async function generateCallSummary(params: {

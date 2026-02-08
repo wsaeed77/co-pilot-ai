@@ -7,9 +7,10 @@ import { getProduct } from '@/lib/products';
 import type { TranscriptUtterance } from '@/lib/openai/types';
 
 export async function POST(request: Request) {
+  let session_id: string | undefined;
   try {
     const body = await request.json();
-    const { session_id } = body;
+    session_id = body.session_id;
 
     if (!session_id) {
       return NextResponse.json(
@@ -80,8 +81,50 @@ export async function POST(request: Request) {
     });
 
     return NextResponse.json(output);
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Copilot update error:', error);
+    const err = error as { status?: number; code?: string; message?: string };
+    if ((err?.status === 429 || err?.code === 'insufficient_quota') && session_id) {
+      try {
+        // Fallback: show questions from product config for missing fields
+        const sess = await getSession(session_id);
+        const productId = sess.product_id ?? 'ground_up_construction';
+        const product = await getProduct(productId);
+        const extractedFields = (sess.extracted_fields ?? {}) as Record<string, string>;
+        const missing = product.required_fields
+          .filter((f) => !extractedFields[f.key])
+          .map((f) => f.key);
+        const fallbackQuestions = product.required_fields
+          .filter((f) => missing.includes(f.key))
+          .slice(0, 3)
+          .map((f) => ({ field: f.key, question: f.question }));
+
+        return NextResponse.json(
+          {
+            error: 'OpenAI quota exceeded. Add billing at platform.openai.com.',
+            suggested_questions: fallbackQuestions,
+            extracted_fields_updates: {},
+            missing_required_fields: missing,
+            answer_suggestions: [],
+            agent_actions: [],
+          },
+          { status: 402 }
+        );
+      } catch {
+        // Fallback failed, return empty
+        return NextResponse.json(
+          {
+            error: 'OpenAI quota exceeded. Add billing at platform.openai.com.',
+            suggested_questions: [],
+            extracted_fields_updates: {},
+            missing_required_fields: [],
+            answer_suggestions: [],
+            agent_actions: [],
+          },
+          { status: 402 }
+        );
+      }
+    }
     return NextResponse.json(
       { error: 'Failed to update copilot' },
       { status: 500 }

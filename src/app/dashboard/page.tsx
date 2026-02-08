@@ -45,6 +45,15 @@ export default function DashboardPage() {
   const [swappedSpeakers, setSwappedSpeakers] = useState(false);
   const [recording, setRecording] = useState(false);
   const [summaryCopied, setSummaryCopied] = useState(false);
+  const [copilotError, setCopilotError] = useState<string | null>(null);
+  const [openaiDebug, setOpenaiDebug] = useState<{
+    status: string;
+    message: string;
+    code?: string;
+    statusCode?: number;
+    duration_ms?: number;
+    timestamp?: string;
+  } | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
 
@@ -96,12 +105,16 @@ export default function DashboardPage() {
 
   const runCopilotUpdate = useCallback(async () => {
     if (!sessionId) return;
+    setCopilotError(null);
     const res = await fetch('/api/copilot/update', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ session_id: sessionId }),
     });
     const data = await res.json();
+    if (data.error && res.status === 402) {
+      setCopilotError(data.error);
+    }
     setCopilotState(data);
   }, [sessionId]);
 
@@ -152,6 +165,13 @@ export default function DashboardPage() {
     setTimeout(() => runCopilotUpdate(), 6000);
   }, [ingestTranscript, runCopilotUpdate]);
 
+  const checkOpenAI = useCallback(async () => {
+    setOpenaiDebug(null);
+    const res = await fetch('/api/debug/openai');
+    const data = await res.json();
+    setOpenaiDebug(data);
+  }, []);
+
   const copySummary = useCallback(() => {
     if (!summary) return;
     const text = `
@@ -181,9 +201,38 @@ ${summary.recommended_next_steps.map((s) => `- ${s}`).join('\n')}
   return (
     <div className="flex min-h-screen flex-col bg-slate-50">
       <header className="border-b border-slate-200 bg-white px-6 py-4">
-        <h1 className="text-xl font-semibold text-slate-800">
-          Prometheus Call Copilot
-        </h1>
+        <div className="flex items-center justify-between">
+          <h1 className="text-xl font-semibold text-slate-800">
+            Prometheus Call Copilot
+          </h1>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={checkOpenAI}
+              className="rounded border border-slate-300 px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-50"
+            >
+              Check OpenAI
+            </button>
+            {openaiDebug && (
+              <div
+                className={`rounded px-3 py-1.5 text-sm ${
+                  openaiDebug.status === 'ok'
+                    ? 'bg-emerald-50 text-emerald-700'
+                    : 'bg-red-50 text-red-700'
+                }`}
+              >
+                {openaiDebug.status === 'ok' ? (
+                  <>✓ {openaiDebug.message} ({openaiDebug.duration_ms}ms)</>
+                ) : (
+                  <>
+                    ✗ {openaiDebug.message}
+                    {openaiDebug.code && ` (${openaiDebug.code})`}
+                    {openaiDebug.statusCode === 429 && ' — Quota exceeded'}
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
       </header>
 
       <main className="flex flex-1 gap-6 p-6">
@@ -256,32 +305,46 @@ ${summary.recommended_next_steps.map((s) => `- ${s}`).join('\n')}
 
         {/* Right: Suggestions + Checklist */}
         <div className="flex w-1/2 flex-col gap-4">
+          {copilotError && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+              {copilotError}
+            </div>
+          )}
           {/* Suggested questions */}
           <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
             <h2 className="mb-2 font-medium text-slate-700">
               Suggested Next Questions
             </h2>
             <ul className="list-inside list-disc space-y-1 text-sm text-slate-600">
-              {copilotState?.suggested_questions?.length
+              {Array.isArray(copilotState?.suggested_questions) &&
+              copilotState.suggested_questions.length > 0
                 ? copilotState.suggested_questions.map((q, i) => (
-                    <li key={i}>{q.question}</li>
+                    <li key={i}>{typeof q === 'string' ? q : (q?.question ?? '')}</li>
                   ))
                 : '—'}
             </ul>
           </div>
 
           {/* Manual answers */}
-          {copilotState?.answer_suggestions && copilotState.answer_suggestions.length > 0 && (
+          {(Array.isArray(copilotState?.answer_suggestions)
+            ? copilotState.answer_suggestions.length > 0
+            : typeof copilotState?.answer_suggestions === 'string') && (
             <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
               <h2 className="mb-2 font-medium text-slate-700">
                 Manual Answer Suggestions
               </h2>
               <ul className="space-y-2 text-sm">
-                {copilotState.answer_suggestions.map((a, i) => (
-                  <li key={i} className="rounded bg-slate-50 p-2">
-                    <strong>{a.topic}:</strong> {a.answer}
-                  </li>
-                ))}
+                {Array.isArray(copilotState?.answer_suggestions)
+                  ? copilotState.answer_suggestions.map((a, i) => (
+                      <li key={i} className="rounded bg-slate-50 p-2">
+                        <strong>{a.topic}:</strong> {a.answer}
+                      </li>
+                    ))
+                  : (
+                      <li className="rounded bg-slate-50 p-2">
+                        {String(copilotState?.answer_suggestions)}
+                      </li>
+                    )}
               </ul>
             </div>
           )}
@@ -290,14 +353,19 @@ ${summary.recommended_next_steps.map((s) => `- ${s}`).join('\n')}
           <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
             <h2 className="mb-2 font-medium text-slate-700">Quote Checklist</h2>
             <ul className="space-y-1 text-sm">
-              {Object.keys(extractedFields).length > 0 || (copilotState?.missing_required_fields?.length ?? 0) > 0 ? (
+              {Object.keys(extractedFields).length > 0 ||
+              (Array.isArray(copilotState?.missing_required_fields) &&
+                copilotState.missing_required_fields.length > 0) ? (
                 <>
                   {Object.entries(extractedFields).map(([k, v]) => (
                     <li key={k} className="flex items-center gap-2">
                       <span className="text-green-600">✓</span> {k}: {v}
                     </li>
                   ))}
-                  {(copilotState?.missing_required_fields ?? []).map((k) => (
+                  {(Array.isArray(copilotState?.missing_required_fields)
+                    ? copilotState.missing_required_fields
+                    : []
+                  ).map((k) => (
                     <li key={k} className="flex items-center gap-2 text-amber-600">
                       <span>⚠</span> {k}
                     </li>
